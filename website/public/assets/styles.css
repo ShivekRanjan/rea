@@ -2733,6 +2733,7 @@ html:lang(zh),
 html:lang(ja),
 html:lang(ko),
 html:lang(th),
+html:lang(hi),
 html[dir="rtl"] {
   letter-spacing: normal;
 }
@@ -2748,6 +2749,9 @@ html:lang(ko) h3,
 html:lang(th) h1,
 html:lang(th) h2,
 html:lang(th) h3,
+html:lang(hi) h1,
+html:lang(hi) h2,
+html:lang(hi) h3,
 html[dir="rtl"] h1,
 html[dir="rtl"] h2,
 html[dir="rtl"] h3 {
@@ -2871,6 +2875,15 @@ html[dir="rtl"] .brand-name {
   --font-mono:
     var(--font-code), "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR",
     "Noto Sans CJK KR", monospace;
+}
+/* Select local Devanagari faces; the Latin stack has no Hindi glyphs. */
+:lang(hi) {
+  --font-sans:
+    var(--font-latin), "Kohinoor Devanagari", "Nirmala UI", "Mangal",
+    "Noto Sans Devanagari", sans-serif;
+  --font-mono:
+    var(--font-code), "Kohinoor Devanagari", "Nirmala UI",
+    "Noto Sans Devanagari", monospace;
 }
 :lang(en) {
   --font-sans: var(--font-latin), sans-serif;

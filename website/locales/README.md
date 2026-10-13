@@ -131,7 +131,7 @@ the page and language you checked; a screenshot can help explain a layout issue.
 PO catalogs have source references, reviewer comments and explicit pending
 translations. They can be edited locally and can later be connected to Weblate
 without replacing the site's translation format. This keeps one authored layout
-and a small offline build instead of maintaining nineteen HTML trees.
+and a small offline build instead of maintaining twenty HTML trees.
 
 See [GNU gettext's PO format](https://www.gnu.org/software/gettext/manual/html_node/PO-File-Entries.html),
 [Weblate's translation workflows](https://docs.weblate.org/en/latest/workflows.html)

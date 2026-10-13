@@ -107,5 +107,11 @@
     "name": "Italiano",
     "readme": "docs/readme/README_it.md",
     "dir": "ltr"
+  },
+  {
+    "code": "hi",
+    "name": "हिन्दी",
+    "readme": "docs/readme/README_hi.md",
+    "dir": "ltr"
   }
 ]
