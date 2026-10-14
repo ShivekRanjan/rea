@@ -29,11 +29,15 @@ describe.skipIf(process.platform === "win32")(
           ["direct.cjs", "./lib.js", "lib.js"],
           ["fallback.cjs", "./fallback", "fallback/index.js"],
           ["legacy-order.cjs", "./dep", "dep/index.js"],
+          ["file-first.cjs", "./both", "both.js"],
+          ["package-main.cjs", "./pkg", "pkg/actual.js"],
+          ["package-main-file.cjs", "./entry", "entry/lib/entry.js"],
         ] as const;
         const unresolved = [
           ["missing.cjs", "./missing/", "missing/"],
           ["escape.cjs", "../outside/", "../outside/"],
           ["main.ts", "./folder.js/.", "folder.js"],
+          ["broken-package.cjs", "./broken", "broken"],
         ] as const;
         const files = new Map<string, string>([
           ["index.js", 'module.exports = "root index";\n'],
@@ -48,6 +52,16 @@ describe.skipIf(process.platform === "win32")(
             'export const value = "emitted filename counterpart";\n',
           ],
           ["missing.js", 'module.exports = "not a directory";\n'],
+          ["both.js", 'module.exports = "file before directory";\n'],
+          ["both/index", 'module.exports = "extensionless index";\n'],
+          ["pkg/package.json", JSON.stringify({ main: "actual.js" })],
+          ["pkg/actual.js", 'module.exports = "package main";\n'],
+          ["pkg/index.js", 'module.exports = "index after main";\n'],
+          ["entry/package.json", JSON.stringify({ main: "lib/entry" })],
+          ["entry/lib/entry.js", 'module.exports = "main with extension";\n'],
+          ["entry/index.js", 'module.exports = "index after main";\n'],
+          ["broken/package.json", "{"],
+          ["broken/index.js", 'module.exports = "invalid package";\n'],
           ...[...imports, ...unresolved].map(
             ([path, specifier]) =>
               [path, `require(${JSON.stringify(specifier)});\n`] as const,
@@ -75,6 +89,9 @@ describe.skipIf(process.platform === "win32")(
         expect(() =>
           createRequire(join(root, "main.ts")).resolve("./folder.js/."),
         ).toThrow();
+        expect(() =>
+          createRequire(join(root, "broken-package.cjs")).resolve("./broken"),
+        ).toThrow(/Invalid package config/u);
         expect(
           createRequire(join(root, "escape.cjs")).resolve("../outside/"),
         ).toBe(outside);

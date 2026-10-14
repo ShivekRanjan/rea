@@ -283,6 +283,12 @@ JavaScript and TypeScript import parsing requires valid UTF-8. Malformed source
 bytes retain their original hashes and sizes with a decoding diagnostic; REA
 does not infer module targets from replacement characters.
 
+Relative `require` calls in JavaScript files resolve as Node's CommonJS loader
+does: the exact file, then `.js`, `.json` and `.node`, then the directory's
+`package.json` `main`, then its index. A `package.json` that cannot be read or
+parsed leaves the dependency unresolved. Requests Node cannot load, and other
+imports, keep the source-level lookup across JavaScript and TypeScript names.
+
 Historical-source import requires safe no-follow file opens on Linux or
 macOS. Native Windows returns `unsupported_host`; use Linux REA inside WSL
 or another supported host. See
