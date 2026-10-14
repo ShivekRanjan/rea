@@ -603,6 +603,9 @@ a later fallback.
 ESM relative module paths, legacy package subpaths without exports, and selected
 package exports targets use URL suffix handling and one percent-decoding pass.
 Bare specifiers retain their complete query/fragment text for exports key matching.
+ESM relative paths and HTML references remove dot segments by URL rules before
+empty segments collapse: `./assets//../app.js` selects `assets/app.js`, while
+CommonJS path normalization selects `app.js`.
 For dependency lookup, ESM constructs a package metadata URL instead of treating
 the parsed package name as a literal directory. A root request such as `legacy?x`
 does not load either `node_modules/legacy?x` or `node_modules/legacy`; an exact

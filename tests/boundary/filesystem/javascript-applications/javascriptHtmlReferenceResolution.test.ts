@@ -97,3 +97,48 @@ it("resolves empty-path HTML script URLs against their canonical base path", asy
     ],
   });
 });
+
+it("resolves parent segments after empty URL path segments like the URL parser", async () => {
+  const root = await createTestTempDirectory("rea-html-empty-segment-");
+  await mkdir(join(root, "assets"));
+  const documents = [
+    ["index.html", null, "./assets//../app.js"],
+    ["root.html", null, "/assets/nested//../../app.js"],
+    ["based.html", "assets//", "../app.js"],
+  ] as const;
+  await Promise.all([
+    writeFile(join(root, "app.js"), "console.log('root');"),
+    writeFile(join(root, "assets", "app.js"), "console.log('assets');"),
+    ...documents.map(([document, base, script]) =>
+      writeFile(
+        join(root, document),
+        `${base === null ? "" : `<base href="${base}">`}<script type="module" src="${script}"></script>`,
+      ),
+    ),
+  ]);
+
+  const { graph } = await reconstructJavaScriptArtifact({
+    input_path: root,
+    format: "directory",
+  });
+  for (const [document, base, script] of documents) {
+    const expected = new URL(
+      script,
+      new URL(base ?? "", `https://artifact.test/${document}`),
+    ).pathname.slice(1);
+    expect(expected).toBe("assets/app.js");
+    const edge = graph.edges.find(
+      ({ relation, properties }) =>
+        relation === "loads" && properties.script_path === script,
+    );
+    expect(edge, script).toMatchObject({
+      properties: { resolved_path: expected, resolution_status: "resolved" },
+    });
+    expect(
+      graph.nodes
+        .find(({ node_id }) => node_id === edge?.target_node_id)
+        ?.observations.some(({ properties }) => properties.path === expected),
+      script,
+    ).toBe(true);
+  }
+});

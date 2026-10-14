@@ -245,6 +245,68 @@ describe("ESM module URL decoding", () => {
   );
 });
 
+// ESM URL resolution lets a parent segment remove an empty segment; CommonJS
+// path normalization collapses the empty segment first.
+it.each([
+  ["import", "assets/app.cjs"],
+  ["require", "app.cjs"],
+] as const)(
+  "matches Node %s for parent segments after empty path segments",
+  async (moduleKind, parentTarget) => {
+    const cases = [
+      ["./assets//../app.cjs", parentTarget],
+      ["./assets/nested//../../app.cjs", parentTarget],
+      ["./assets//app.cjs", "assets/app.cjs"],
+    ] as const;
+    const root = await createTestTempDirectory("rea-module-empty-segment-");
+    await mkdir(join(root, "assets"));
+    await writeFile(join(root, "app.cjs"), 'module.exports = "app.cjs";');
+    await writeFile(
+      join(root, "assets", "app.cjs"),
+      'module.exports = "assets/app.cjs";',
+    );
+    const main = join(root, moduleKind === "import" ? "main.mjs" : "main.cjs");
+    await writeFile(
+      main,
+      cases
+        .map(([specifier], index) =>
+          moduleKind === "import"
+            ? `import value${index} from ${JSON.stringify(specifier)}; console.log(value${index});`
+            : `console.log(require(${JSON.stringify(specifier)}));`,
+        )
+        .join("\n"),
+    );
+    const native = await promisify(execFile)(process.execPath, [main], {
+      timeout: 5_000,
+    });
+    expect(native.stdout.trim().split("\n")).toEqual(
+      cases.map(([, target]) => target),
+    );
+
+    const result = await analyzeJavaScriptApplication({
+      input_path: root,
+      format: "directory",
+    });
+    if (!result.ok) throw result.error;
+    const { graph } = javascriptApplicationAnalysisResultSchema.parse(
+      result.value.normalized_result,
+    );
+    for (const [specifier, target] of cases) {
+      const imports = graph.edges.filter(
+        (edge) =>
+          edge.relation === "imports" &&
+          edge.properties.specifier === specifier,
+      );
+      expect(imports.length, `${moduleKind} ${specifier}`).toBeGreaterThan(0);
+      for (const edge of imports)
+        expect(
+          edge.properties.resolved_path,
+          `${moduleKind} ${specifier}`,
+        ).toBe(target);
+    }
+  },
+);
+
 const packageEntryUrlCases = [
   ["exports", "./actual%20file.cjs", "actual file.cjs"],
   ["exports", "./actual.cjs?variant", "actual.cjs"],

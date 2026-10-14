@@ -559,14 +559,17 @@ const contextualCandidate = (
       ]);
     return exactUrlPathCandidate(
       decoded,
-      relativeCandidate(input.sourcePath, decoded),
+      relativeUrlCandidate(input.sourcePath, decoded),
       "URL",
     );
   }
-  const candidate = relativeCandidate(input.sourcePath, declared);
-  return context === "module-specifier" && input.moduleKind === "import"
-    ? exactUrlPathCandidate(declared, candidate, "module URL")
-    : candidate;
+  return hasUrlPathSemantics
+    ? exactUrlPathCandidate(
+        declared,
+        relativeUrlCandidate(input.sourcePath, declared),
+        "module URL",
+      )
+    : relativeCandidate(input.sourcePath, declared);
 };
 
 const decodeModuleUrlPath = (
@@ -592,6 +595,42 @@ const relativeCandidate = (sourcePath: string, declared: string): string =>
   declared.startsWith("/")
     ? declared.slice(1)
     : posix.join(posix.dirname(sourcePath), declared);
+
+/**
+ * Resolve a decoded URL path against a base path with URL path rules. Dot
+ * segments are removed while empty segments are still segments, so the `..` in
+ * `assets//../app.js` removes the empty segment rather than `assets`.
+ * Canonical normalization later collapses surviving empty segments the way a
+ * file URL lookup does.
+ */
+const relativeUrlCandidate = (basePath: string, declared: string): string => {
+  if (declared.startsWith("/")) return removeUrlDotSegments(declared.slice(1));
+  // The base URL's directory keeps its final separator and empty segments.
+  const directory = basePath.slice(0, basePath.lastIndexOf("/") + 1);
+  return removeUrlDotSegments(`${directory}${declared}`);
+};
+
+/**
+ * RFC 3986 dot-segment removal for a root-relative logical path. A final dot
+ * segment leaves directory form, as URL resolution does. Parent segments above
+ * the root are retained so confinement rejects them instead of clamping.
+ */
+const removeUrlDotSegments = (path: string): string => {
+  const segments = path.split("/");
+  const output: string[] = [];
+  for (const [index, segment] of segments.entries()) {
+    if (segment !== "." && segment !== "..") {
+      output.push(segment);
+      continue;
+    }
+    if (segment === "..") {
+      if (output.length > 0 && output.at(-1) !== "..") output.pop();
+      else output.push("..");
+    }
+    if (index === segments.length - 1) output.push("");
+  }
+  return output.join("/");
+};
 
 const bareModuleCandidate = (
   input: ResolveArtifactPathInput,
@@ -1066,11 +1105,12 @@ const htmlCandidate = (
     return unresolvedCandidate("rejected", [
       "The HTML reference path percent-decodes to NUL or to bytes that are not UTF-8.",
     ]);
-  if (declaredPath.startsWith("/")) return declaredPath.slice(1);
+  if (declaredPath.startsWith("/"))
+    return relativeUrlCandidate(input.sourcePath, declaredPath);
   if (base === undefined || base === null || base === "")
     return declaredPath === ""
       ? input.sourcePath
-      : posix.join(posix.dirname(input.sourcePath), declaredPath);
+      : relativeUrlCandidate(input.sourcePath, declaredPath);
   // A local base href is a second untrusted path input; apply the same
   // admission rules a declared path gets so it cannot smuggle traversal or
   // separator syntax past canonicalization.
@@ -1083,12 +1123,10 @@ const htmlCandidate = (
     return unresolvedCandidate("rejected", [
       "The document base href path percent-decodes to NUL or to bytes that are not UTF-8.",
     ]);
-  const basePath = decodedBase.startsWith("/")
-    ? decodedBase.slice(1)
-    : posix.join(posix.dirname(input.sourcePath), decodedBase);
+  const basePath = relativeUrlCandidate(input.sourcePath, decodedBase);
   if (declaredPath === "")
     return exactUrlPathCandidate(decodedBase, basePath, "HTML");
-  return posix.join(htmlBaseDirectory(decodedBase, basePath), declaredPath);
+  return relativeUrlCandidate(basePath, declaredPath);
 };
 
 const exactUrlPathCandidate = (
@@ -1111,9 +1149,6 @@ const urlPathIsDirectory = (path: string): boolean =>
   path.endsWith("/..") ||
   path === "." ||
   path === "..";
-
-const htmlBaseDirectory = (base: string, basePath: string): string =>
-  urlPathIsDirectory(base) ? basePath : posix.dirname(basePath);
 
 const confineCandidate = (candidate: string): string | CandidateResolution => {
   const normalized = normalizeJoinedLogicalPath(candidate);
